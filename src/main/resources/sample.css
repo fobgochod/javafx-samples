@@ -1,0 +1,18 @@
+.root {
+    -fx-font-size: 18;
+}
+
+.label {
+    -fx-pref-width: 100;
+    -fx-pref-height: 30;
+}
+
+.text-field {
+    -fx-min-width: 500;
+    -fx-pref-height: 30;
+}
+
+.button {
+    -fx-pref-width: 600;
+    -fx-pref-height: 60;
+}
