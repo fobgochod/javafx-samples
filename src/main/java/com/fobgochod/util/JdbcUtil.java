@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +21,8 @@ import java.util.Map;
  */
 public class JdbcUtil {
 
-    public static final String hash = "20190520";
+    private static final String hash = "20191012";
+    private static final String targetId = "superUser";
     private static final int len = 1024;
 
     private static Connection conn;
@@ -40,7 +42,7 @@ public class JdbcUtil {
         return conn;
     }
 
-    public static void data(String url, String username, String password) {
+    public static void initSql(String url, String username, String password, String filePath) {
         List<Role> roles = new ArrayList<>();
         List<String> inserts = new ArrayList<>();
 
@@ -52,7 +54,7 @@ public class JdbcUtil {
         conn = getConnection(url, username, password);
 
         try {
-            ps = conn.prepareStatement("select sid, tenant_sid, id, name from role where id='endUser' and sid not in (41325034943040,41319959827008)");
+            ps = conn.prepareStatement(String.format("select sid, tenant_sid, id, name from role where id = '%s'", targetId));
             rs = ps.executeQuery();
             while (rs.next()) {
                 Role role = new Role();
@@ -68,12 +70,12 @@ public class JdbcUtil {
                 long policySid = SnowFlake.getInstance().newId();
                 long statementAllowSid = SnowFlake.getInstance().newId();
 
-                String insertPolicy = String.format("insert into policy(sid, hash, tenant_sid, id, name) values(%s, '%s', %s, 'role_endUser_DigiwinCloud', 'role_endUser_DigiwinCloud');", policySid, hash, role.getTenantSid());
+                String insertPolicy = String.format("insert into policy(sid, hash, tenant_sid, id, name) values(%s, '%s', %s, 'role_%s_DigiwinCloud', 'role_%s_DigiwinCloud');", policySid, hash, role.getTenantSid(), targetId, targetId);
                 String insertPolicyOnRole = String.format("inset into policyonrole(sid, hash, policy_sid, role_sid) values(%s, '%s', %s, %s);", SnowFlake.getInstance().newId(), hash, policySid, role.getSid());
                 String insertStatementAllow = String.format("insert into statement(sid, hash, effect, policy_sid) values(%s, '%s', 'allow', %s);", statementAllowSid, hash, policySid);
                 String insertStatementDeny = String.format("insert into statement(sid, hash, effect, policy_sid) values(%s, '%s', 'deny', %s);", SnowFlake.getInstance().newId(), hash, policySid);
-                String insertStatementTargetModule = String.format("insert into statementtarget(sid, hash, is_cascade, statement_sid, target_sid, type) values(%s, '%s', 0, %s, 42452332737088, 'module');", SnowFlake.getInstance().newId(), hash, statementAllowSid);
-                String insertStatementTargetAction = String.format("insert into statementtarget(sid, hash, is_cascade, statement_sid, target_sid, type) values(%s, '%s', 0, %s, 42452332794432, 'action');", SnowFlake.getInstance().newId(), hash, statementAllowSid);
+                String insertStatementTargetModule = String.format("insert into statementtarget(sid, hash, is_cascade, statement_sid, target_sid, type) values(%s, '%s', 0, %s, 43143759843904, 'module');", SnowFlake.getInstance().newId(), hash, statementAllowSid);
+                String insertStatementTargetAction = String.format("insert into statementtarget(sid, hash, is_cascade, statement_sid, target_sid, type) values(%s, '%s', 0, %s, 43143760798272, 'action');", SnowFlake.getInstance().newId(), hash, statementAllowSid);
 
                 inserts.add(insertPolicy);
                 inserts.add(insertPolicyOnRole);
@@ -83,12 +85,12 @@ public class JdbcUtil {
                 inserts.add(insertStatementTargetAction);
 
 
-                policies.add(String.format("(%s, '%s', %s, 'role_endUser_DigiwinCloud', 'role_endUser_DigiwinCloud'),", policySid, hash, role.getTenantSid()));
+                policies.add(String.format("(%s, '%s', %s, 'role_%s_DigiwinCloud', 'role_%s_DigiwinCloud'),", policySid, hash, role.getTenantSid(), targetId, targetId));
                 policyOnRoles.add(String.format("(%s, '%s', %s, %s),", SnowFlake.getInstance().newId(), hash, policySid, role.getSid()));
                 statements.add(String.format("(%s, '%s', 'allow', %s),", statementAllowSid, hash, policySid));
                 statements.add(String.format("(%s, '%s', 'deny', %s),", SnowFlake.getInstance().newId(), hash, policySid));
-                statementTargets.add(String.format("(%s, '%s', 0, %s, 42452332737088, 'module'),", SnowFlake.getInstance().newId(), hash, statementAllowSid));
-                statementTargets.add(String.format("(%s, '%s', 0, %s, 42452332794432, 'action'),", SnowFlake.getInstance().newId(), hash, statementAllowSid));
+                statementTargets.add(String.format("(%s, '%s', 0, %s, 43143759843904, 'module'),", SnowFlake.getInstance().newId(), hash, statementAllowSid));
+                statementTargets.add(String.format("(%s, '%s', 0, %s, 43143760798272, 'action'),", SnowFlake.getInstance().newId(), hash, statementAllowSid));
             }
 
             Map<String, String> mapSql = new HashMap<>(4);
@@ -103,28 +105,7 @@ public class JdbcUtil {
             map.put("statement", statements);
             map.put("statementtarget", statementTargets);
 
-            for (Map.Entry<String, List<String>> entry : map.entrySet()) {
-                int i = 0;
-                StringBuilder sb = new StringBuilder();
-
-                for (String policy : entry.getValue()) {
-                    sb.append("\n");
-                    if (i % len == 0) {
-                        sb.append(mapSql.get(entry.getKey()));
-                        sb.append("\n");
-                    }
-                    sb.append(policy);
-                    i++;
-                    if (i % len == 0) {
-                        sb.deleteCharAt(sb.length() - 1);
-                        sb.append(";");
-                        sb.append("\n\n");
-                    }
-                }
-                sb.deleteCharAt(sb.length() - 1);
-                sb.append(";");
-                FileUtil.write(FileUtil.getFile(String.format("C:\\Users\\Seven\\Desktop\\%s.sql", "endUser")), sb.toString());
-            }
+            printSqlFile(mapSql, map, filePath);
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
@@ -135,6 +116,73 @@ public class JdbcUtil {
             } catch (SQLException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    public static void initSql2(String url, String username, String password, String filePath) {
+        List<Role> roles = new ArrayList<>();
+
+        List<String> policies = new ArrayList<>();
+        List<String> policyOnRoles = new ArrayList<>();
+        List<String> statements = new ArrayList<>();
+
+        conn = getConnection(url, username, password);
+        try {
+            ps = conn.prepareStatement(String.format("select sid, tenant_sid, id, name from role where id = '%s' and sid = 43058565358144", targetId));
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                Role role = new Role();
+                role.setSid(rs.getLong(1));
+                role.setTenantSid(rs.getLong(2));
+                role.setId(rs.getString(3));
+                role.setName(rs.getString(4));
+                roles.add(role);
+            }
+
+            for (Role role : roles) {
+                long policySid = SnowFlake.getInstance().newId();
+                policies.add(String.format("(%s, '%s', %s, 'role_%s_DigiwinCloud', 'role_%s_DigiwinCloud', 1984619653),", policySid, hash, role.getTenantSid(), targetId, targetId));
+                policyOnRoles.add(String.format("(%s, '%s', %s, %s),", SnowFlake.getInstance().newId(), hash, policySid, role.getSid()));
+                statements.add(String.format("(%s, '%s', 0, 'allow', %s, 43143760798272, 'action'),", SnowFlake.getInstance().newId(), hash, policySid));
+            }
+            Map<String, String> mapSql = new LinkedHashMap<>(3);
+            mapSql.put("policy", "insert into policy(sid, hash, tenant_sid, id, name, sys_sid) values");
+            mapSql.put("policyonrole", "insert into policyonrole(sid, hash, policy_sid, role_sid) values");
+            mapSql.put("statement", "insert into statement(sid, hash, is_cascade, effect, policy_sid, target_sid, type) values");
+
+            Map<String, List<String>> mapValue = new LinkedHashMap<>(3);
+            mapValue.put("policy", policies);
+            mapValue.put("policyonrole", policyOnRoles);
+            mapValue.put("statement", statements);
+
+            printSqlFile(mapSql, mapValue, filePath);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void printSqlFile(Map<String, String> mapSql, Map<String, List<String>> mapValue, String filePath) {
+        for (Map.Entry<String, List<String>> entry : mapValue.entrySet()) {
+            int i = 0;
+            StringBuilder batchSql = new StringBuilder();
+
+            for (String value : entry.getValue()) {
+                batchSql.append("\n");
+                if (i % len == 0) {
+                    batchSql.append(mapSql.get(entry.getKey()));
+                    batchSql.append("\n");
+                }
+                batchSql.append(value);
+                i++;
+                if (i % len == 0) {
+                    batchSql.deleteCharAt(batchSql.length() - 1);
+                    batchSql.append(";");
+                    batchSql.append("\n\n");
+                }
+            }
+            batchSql.deleteCharAt(batchSql.length() - 1);
+            batchSql.append(";");
+            FileUtil.write(FileUtil.getFile(filePath), batchSql.toString());
         }
     }
 }

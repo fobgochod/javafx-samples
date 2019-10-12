@@ -17,7 +17,7 @@ public class MainEntrance extends Application {
         // Parent root = FXMLLoader.load(getClass().getResource("/sample.fxml"));
         Parent root = FXMLLoader.load(getClass().getClassLoader().getResource("sample.fxml"));
 
-        Scene scene = new Scene(root, 600, 500);
+        Scene scene = new Scene(root, 600, 300);
         scene.getStylesheets().add(getClass().getClassLoader().getResource("sample.css").toExternalForm());
 
         primaryStage.setTitle("JavaFX Tool");
